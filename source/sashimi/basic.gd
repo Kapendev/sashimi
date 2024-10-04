@@ -8,11 +8,14 @@ const int_max   := 9223372036854775807
 const float_min := -1.79769e308
 const float_max := 1.79769e308
 
+const digit_chars := "0123456789"
+const assets_path := "res://assets/"
+
 const type_error_message := "Function does not support the given type."
 
 # ( General Utilities )
 
-class BasicState extends Node:
+class BasicState extends Node2D:
 	var time: float
 	var tick_count: int
 
@@ -32,6 +35,20 @@ static func quit() -> void:
 static func panic(message: String) -> void:
 	print(message)
 	quit()
+	@warning_ignore("assert_always_false")
+	assert(0, message)
+
+static func enter(path: String) -> void:
+	basic_state.get_tree().change_scene(assets_path + path)
+
+static func read(path: String) -> Variant:
+	const kinds := ["txt", "ini", "sv", "md"]
+	for kind in kinds:
+		if (path.ends_with(kind)):
+			var file := FileAccess.open(assets_path + path, FileAccess.READ)
+			if file == null: return null
+			return file.get_as_text()
+	return load(assets_path + path)
 
 static func to_v2(value) -> Vector2:
 	if value is bool:
@@ -62,6 +79,19 @@ static func to_v4(value) -> Vector4:
 	else:
 		panic(type_error_message)
 		return Vector4()
+
+static func take_area(node: Sprite2D) -> Rect2:
+	var result := node.get_rect()
+	result.position = node.global_position + node.offset
+	result.size = result.size * node.scale
+	if node.centered: result.position -= Vector2(result.size.x * 0.5, result.size.y * 0.5)
+	return result
+
+static func has_point(node: Sprite2D, point: Vector2) -> bool:
+	return take_area(node).has_point(point)
+
+static func has_area(node: Sprite2D, area: Rect2) -> bool:
+	return take_area(node).intersects(area)
 
 static func move_to(from, to, delta) -> Variant:
 	if from is float and to is float and delta is float:

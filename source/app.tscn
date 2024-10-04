@@ -10,3 +10,8 @@ script = ExtResource("1_67k74")
 
 [node name="sprite" type="Sprite2D" parent="."]
 texture = SubResource("CompressedTexture2D_b7daw")
+
+[node name="color" type="ColorRect" parent="."]
+offset_right = 40.0
+offset_bottom = 40.0
+color = Color(1, 1, 1, 0.8)
