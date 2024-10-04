@@ -7,11 +7,9 @@ Each script is standalone and can be easily copied into a project with no extra 
 > [!WARNING]
 > This is alpha software. Use it only if you are very cool.
 
-## Scripts
+## Examples
 
-* Error Handling (`faults.gd`)
-* Math Utilities (`math.gd`)
-* General Utilities (`utils.gd`)
+Look at the [app.gd](source/app.gd) file.
 
 ## Note
 
