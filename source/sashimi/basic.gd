@@ -1,11 +1,37 @@
+extends RefCounted
+class_name SashimiBasic
+
+static var basic_state: BasicState
+
+const int_min   := -9223372036854775808
+const int_max   := 9223372036854775807
+const float_min := -1.79769e308
+const float_max := 1.79769e308
+
+const type_error_message := "Function does not support the given type."
+
+# ( General Utilities )
+
+class BasicState extends Node:
+	var time: float
+	var tick_count: int
+
+	func _process(dt: float) -> void:
+		time = fmod((time + dt), float_max)
+		tick_count = (tick_count + 1) % int_max
+
 static func is_number_type(value) -> bool:
 	return value is int or value is float
 
 static func is_vector_type(value) -> bool:
 	return value is Vector2 or value is Vector3 or value is Vector4
 
-static func type_error_message() -> String:
-	return "Function does not support the given type."
+static func quit() -> void:
+	basic_state.get_tree().quit()
+
+static func panic(message: String) -> void:
+	print(message)
+	quit()
 
 static func to_v2(value) -> Vector2:
 	if value is bool:
@@ -14,8 +40,7 @@ static func to_v2(value) -> Vector2:
 	elif is_number_type(value):
 		return Vector2(value, value)
 	else:
-		@warning_ignore("assert_always_false")
-		assert(0, type_error_message())
+		panic(type_error_message)
 		return Vector2()
 
 static func to_v3(value) -> Vector3:
@@ -25,8 +50,7 @@ static func to_v3(value) -> Vector3:
 	elif is_number_type(value):
 		return Vector3(value, value, value)
 	else:
-		@warning_ignore("assert_always_false")
-		assert(0, type_error_message())
+		panic(type_error_message)
 		return Vector3()
 
 static func to_v4(value) -> Vector4:
@@ -36,8 +60,7 @@ static func to_v4(value) -> Vector4:
 	elif is_number_type(value):
 		return Vector4(value, value, value, value)
 	else:
-		@warning_ignore("assert_always_false")
-		assert(0, type_error_message())
+		panic(type_error_message)
 		return Vector4()
 
 static func move_to(from, to, delta) -> Variant:
@@ -59,14 +82,12 @@ static func move_to(from, to, delta) -> Variant:
 			else: result.y = to.y
 		return result
 	else:
-		@warning_ignore("assert_always_false")
-		assert(0, type_error_message())
+		panic(type_error_message)
 		return 0.0
 
 static func move_to_with_slowdown(from, to, delta, slowdown) -> Variant:
 	if not (slowdown is float):
-		@warning_ignore("assert_always_false")
-		assert(0, type_error_message())
+		panic(type_error_message)
 		return 0.0
 
 	if from is float and to is float and delta is float:
@@ -84,8 +105,7 @@ static func move_to_with_slowdown(from, to, delta, slowdown) -> Variant:
 			result.w = move_to_with_slowdown(from.w, to.w, delta.w, slowdown)
 		return result
 	else:
-		@warning_ignore("assert_always_false")
-		assert(0, type_error_message())
+		panic(type_error_message)
 		return 0.0
 
 static func follow_position(object, to, delta) -> void:
@@ -106,6 +126,88 @@ static func follow_rotation_with_slowdown(object, to, delta, slowdown) -> void:
 static func follow_scale_with_slowdown(object, to, delta, slowdown) -> void:
 	object.scale = move_to_with_slowdown(object.scale, to, delta, slowdown)
 
+static func elapsed_time() -> float:
+	return basic_state.time
+
+static func elapsed_tick_count() -> float:
+	return basic_state.tick_count
+
+static func resolution_width() -> int:
+	return basic_state.get_tree().get_root().content_scale_size.x
+
+static func resolution_height() -> int:
+	return basic_state.get_tree().get_root().content_scale_size.y
+
+static func resolution() -> Vector2:
+	return basic_state.get_tree().get_root().content_scale_size
+
+static func mouse_screen_position() -> Vector2:
+	return basic_state.get_viewport().get_mouse_position()
+
+static func mouse_world_position() -> Vector2:
+	return basic_state.get_global_mouse_position()
+
+static func is_down(key: String) -> bool:
+	if len(key) != 1:
+		panic("String is not a valid key. Length must be 1.")
+		return false
+	var target := key.to_upper().unicode_at(0)
+	return Input.is_physical_key_pressed(target)
+
+static func wasd() -> Vector2:
+	var result := Vector2()
+	if is_down("w") or Input.is_action_pressed("ui_up"): result.y += -1
+	if is_down("a") or Input.is_action_pressed("ui_left"): result.x += -1
+	if is_down("s") or Input.is_action_pressed("ui_down"): result.y += 1
+	if is_down("d") or Input.is_action_pressed("ui_right"): result.x += 1
+	return result
+
+# ( Error Handling )
+
+class Result extends RefCounted:
+	var value: Variant
+	var fault: int
+
+	func is_none() -> bool:
+		return fault != 0
+
+	func is_some() -> bool:
+		return fault == 0
+
+	func take() -> Variant:
+		if is_some():
+			SashimiBasic.panic("Fault `{0}` was detected.".format([fault]))
+		return value
+
+	func take_or() -> Variant:
+		return value
+
+static func some(value) -> Result:
+	var result := Result.new()
+	result.value = value
+	return result
+
+static func none(fault := 1) -> Result:
+	var result := Result.new()
+	result.fault = fault
+	return result
+
+# ( Script )
+
+static func is_script_ready() -> bool:
+	return basic_state != null and basic_state.is_inside_tree()
+
+static func ready_script(parent: Node) -> void:
+	if basic_state != null and basic_state.is_inside_tree(): return
+	basic_state = BasicState.new()
+	basic_state.name = "sashimi_basic_state"
+	parent.add_child(basic_state)
+
 static func test_script() -> void:
-	pass
+	assert(none().is_none() == true);
+	assert(none().is_some() == false);
+	assert(none().take_or() == null);
+	assert(some(9).is_none() == false);
+	assert(some(9).is_some() == true);
+	assert(some(9).take_or() == 9);
 
