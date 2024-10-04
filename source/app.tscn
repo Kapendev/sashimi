@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3 uid="uid://bt0uworkmvn6l"]
+
+[ext_resource type="Script" path="res://source/app.gd" id="1_67k74"]
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_b7daw"]
+load_path = "res://.godot/imported/icon.svg-218a8f2b3041327d8a5756f3a245f83b.ctex"
+
+[node name="app" type="Node"]
+script = ExtResource("1_67k74")
+
+[node name="sprite" type="Sprite2D" parent="."]
+texture = SubResource("CompressedTexture2D_b7daw")
