@@ -189,7 +189,7 @@ static func mouse_screen_position() -> Vector2:
 static func mouse_world_position() -> Vector2:
 	return basic_state.get_global_mouse_position()
 
-static func is_down(key: String) -> bool:
+static func is_pressed(key: String) -> bool:
 	if len(key) != 1:
 		panic("String is not a valid key. Length must be 1.")
 		return false
@@ -198,30 +198,115 @@ static func is_down(key: String) -> bool:
 
 static func wasd() -> Vector2:
 	var result := Vector2()
-	if is_down("w") or Input.is_action_pressed("ui_up"): result.y += -1
-	if is_down("a") or Input.is_action_pressed("ui_left"): result.x += -1
-	if is_down("s") or Input.is_action_pressed("ui_down"): result.y += 1
-	if is_down("d") or Input.is_action_pressed("ui_right"): result.x += 1
+	if is_pressed("w") or Input.is_action_pressed("ui_up"): result.y += -1
+	if is_pressed("a") or Input.is_action_pressed("ui_left"): result.x += -1
+	if is_pressed("s") or Input.is_action_pressed("ui_down"): result.y += 1
+	if is_pressed("d") or Input.is_action_pressed("ui_right"): result.x += 1
 	return result
 
 static func draw_rect(shape: Rect2, color: Color) -> void:
 	basic_state.shapes.append(shape)
 	basic_state.colors.append(color)
 
-static func make_sprite(path: String) -> Sprite2D:
-	var result := Sprite2D.new()
-	result.texture = read(path)
-	return result
-
-static func add_node(node, name := "node") -> Variant:
+static func add_node(node) -> Variant:
 	basic_state.add_child(node)
-	node.name = name
 	if node is Node2D:
 		node.z_as_relative = false
 	return node
 
-static func add_sprite(path: String, name := "sprite") -> Sprite2D:
-	return add_node(make_sprite(path), name)
+static func add_child(node, to) -> Variant:
+	to.add_child(node)
+	if node is Node2D:
+		node.z_as_relative = false
+	return node
+
+# ( Sprite Animation )
+
+class SpriteAnimation extends RefCounted:
+	var frame_row := 0
+	var frame_count := 1
+	var frame_speed := 6
+
+static func make_sprite_animation(frame_row: int, frame_count: int, frame_speed: int) -> SpriteAnimation:
+	var result := SpriteAnimation.new()
+	result.frame_row = frame_row
+	result.frame_count = frame_count
+	result.frame_speed = frame_speed
+	return result
+
+class Sprite extends Sprite2D:
+	var width: int
+	var height: int
+	var atlas_left: int
+	var atlas_top: int
+	var frame_progress: float
+	var animation: SpriteAnimation
+
+	func _process(dt: float) -> void:
+		# Update animation.
+		if (animation):
+			if not (animation.frame_count <= 1):
+				frame_progress = fmod(frame_progress + animation.frame_speed * dt, animation.frame_count);
+		# Update sprite.
+		if width == 0 or height == 0: return
+		var top := atlas_top + animation.frame_row * height if animation else 0
+		var grid_width := int(max(texture.get_width() - atlas_left, 0) / width)
+		var grid_height := int(max(texture.get_height() - top, 0) / height)
+		if grid_width == 0 or grid_height == 0: return
+		var row := int(frame() / float(grid_width))
+		var col := frame() % grid_width
+		var area := Rect2(atlas_left + col * width, top + row * height, width, height)
+		region_enabled = true
+		region_rect = area
+
+	func has_first_frame() -> bool:
+		return frame() == 0
+
+	func has_last_frame() -> bool:
+		if animation.frameCount != 0: return frame() == animation.frameCount - 1
+		else: return true
+
+	func size() -> Vector2:
+		return Vector2(width, height)
+
+	func frame() -> int:
+		return int(frame_progress)
+
+	func reset(reset_frame := 0) -> void:
+		frame_progress = reset_frame
+
+	func play(other: SpriteAnimation, can_keep_frame := false) -> void:
+		if animation != other:
+			if can_keep_frame: reset()
+			animation = other
+
+	func follow_position(to: Vector2, delta: Vector2) -> void:
+		position = SashimiBasic.move_to(position, to, delta)
+
+	func follow_position_with_slowdown(to: Vector2, delta: Vector2, slowdown: float) -> void:
+		position = SashimiBasic.move_to_with_slowdown(position, to, delta, slowdown)
+
+static func make_animated_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
+	var result := Sprite.new()
+	result.width = width
+	result.height = height
+	result.atlas_left = atlas_left
+	result.atlas_top = atlas_top
+	result.animation = animation
+	result.texture = read(path)
+	return result
+
+static func add_animated_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
+	return add_node(make_animated_sprite(path, width, height, atlas_left, atlas_top, animation))
+
+static func make_sprite(path: String) -> Sprite:
+	var result := make_animated_sprite(path, 0, 0, 0, 0, null)
+	result.width = result.texture.get_width()
+	result.height = result.texture.get_height()
+	return result
+
+static func add_sprite(path: String) -> Sprite:
+	return add_node(make_sprite(path))
 
 # ( Error Handling )
 

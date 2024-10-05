@@ -4,5 +4,3 @@
 
 [node name="app" type="Node"]
 script = ExtResource("1_67k74")
-
-[node name="Node2D" type="Node2D" parent="."]
