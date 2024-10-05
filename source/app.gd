@@ -3,22 +3,16 @@ extends Node
 const basic = preload("res://source/sashimi/basic.gd")
 
 var sprite: Sprite2D
-var target: Vector2
-var color: ColorRect
 
 func _ready() -> void:
 	basic.test_script()
 	basic.ready_script(self)
-	sprite = get_node("sprite")
-	color = get_node("color")
+	sprite = basic.add_sprite("../icon.svg")
 	print(basic.read("secret.txt"))
 
 func _process(dt: float) -> void:
 	if basic.is_down("1"): basic.quit()
 	if basic.is_down("2"): basic.panic("An error occurred.")
-
-	if (basic.wasd()): print("WASD keys: ", basic.wasd())
-	color.visible = basic.has_point(sprite, basic.mouse_screen_position())
 
 	var slowdown := 0.3
 	var position_value := basic.mouse_world_position()
@@ -26,3 +20,11 @@ func _process(dt: float) -> void:
 	basic.follow_position_with_slowdown(sprite, position_value, basic.to_v2(dt), slowdown)
 	basic.follow_scale_with_slowdown(sprite, scale_value, basic.to_v2(dt), slowdown)
 
+	if (basic.wasd()): print("WASD keys: ", basic.wasd())
+
+	if basic.has_point(sprite, basic.mouse_screen_position()):
+		basic.draw_rect(Rect2(32, 32, 32, 32), Color.SKY_BLUE)
+		sprite.modulate = Color.SKY_BLUE
+	else:
+		basic.draw_rect(Rect2(32, 32, 32, 32), Color.WHITE)
+		sprite.modulate = Color.WHITE

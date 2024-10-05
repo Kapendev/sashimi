@@ -18,10 +18,22 @@ const type_error_message := "Function does not support the given type."
 class BasicState extends Node2D:
 	var time: float
 	var tick_count: int
+	var shapes: Array[Rect2]
+	var colors: Array[Color]
+
+	func _ready() -> void:
+		z_index = 999
 
 	func _process(dt: float) -> void:
 		time = fmod((time + dt), float_max)
 		tick_count = (tick_count + 1) % int_max
+		queue_redraw()
+
+	func _draw() -> void:
+		for i in range(len(shapes)):
+			draw_rect(shapes[i], colors[i])
+		shapes.clear()
+		colors.clear()
 
 static func is_number_type(value) -> bool:
 	return value is int or value is float
@@ -191,6 +203,25 @@ static func wasd() -> Vector2:
 	if is_down("s") or Input.is_action_pressed("ui_down"): result.y += 1
 	if is_down("d") or Input.is_action_pressed("ui_right"): result.x += 1
 	return result
+
+static func draw_rect(shape: Rect2, color: Color) -> void:
+	basic_state.shapes.append(shape)
+	basic_state.colors.append(color)
+
+static func make_sprite(path: String) -> Sprite2D:
+	var result := Sprite2D.new()
+	result.texture = read(path)
+	return result
+
+static func add_node(node, name := "node") -> Variant:
+	basic_state.add_child(node)
+	node.name = name
+	if node is Node2D:
+		node.z_as_relative = false
+	return node
+
+static func add_sprite(path: String, name := "sprite") -> Sprite2D:
+	return add_node(make_sprite(path), name)
 
 # ( Error Handling )
 

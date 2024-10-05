@@ -13,7 +13,7 @@ Look at the [app.gd](source/app.gd) file.
 
 ## Note
 
-I add things to Sashimi when I need them and only Godot 4 is supported.
+I add things to Sashimi when I need them and I support only Godot 4.
 
 ## License
 
