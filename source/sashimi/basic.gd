@@ -317,6 +317,12 @@ class Sprite extends Sprite2D:
 			if can_keep_frame: reset()
 			animation = other
 
+	func has_point(point: Vector2) -> bool:
+		return SashimiBasic.has_point(self, point)
+
+	func has_area(area: Rect2) -> bool:
+		return SashimiBasic.has_area(self, area)
+
 	func follow_position(to: Vector2, delta: Vector2) -> void:
 		position = SashimiBasic.move_to(position, to, delta)
 

@@ -27,7 +27,7 @@ func _process(dt: float) -> void:
 	sprite.follow_position_with_slowdown(position_value, Vector2(dt, dt), slowdown)
 	sprite.follow_scale_with_slowdown(scale_value, Vector2(dt, dt), slowdown)
 
-	if basic.has_point(sprite, basic.mouse_screen_position()):
+	if sprite.has_point(basic.mouse_screen_position()):
 		basic.draw_rect(Rect2(32, 32, 32, 32), Color.SKY_BLUE)
 		sprite.play(animation2)
 	else:
