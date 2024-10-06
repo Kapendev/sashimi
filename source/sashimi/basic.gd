@@ -1,17 +1,35 @@
+# ---
+# Copyright 2024 Alexandros F. G. Kapretsos
+# SPDX-License-Identifier: MIT
+# Email: alexandroskapretsos@gmail.com
+# Project: https://github.com/Kapendev/sashimi
+# Version: v0.0.1
+# ---
+
 extends RefCounted
 class_name SashimiBasic
 
 static var basic_state: BasicState
 
-const int_min   := -9223372036854775808
-const int_max   := 9223372036854775807
-const float_min := -1.79769e308
-const float_max := 1.79769e308
+const INT_MIN   := -9223372036854775808
+const INT_MAX   := 9223372036854775807
+const FLOAT_MIN := -1.79769e308
+const FLOAT_MAX := 1.79769e308
 
-const digit_chars := "0123456789"
-const assets_path := "res://assets/"
+const GRAY1 := Color("202020")
+const GRAY2 := Color("606060")
+const GRAY3 := Color("9f9f9f")
+const GRAY4 := Color("dfdfdf")
 
-const type_error_message := "Function does not support the given type."
+const DIGIT_CHARS := "0123456789"
+const UPPER_CHARS := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const LOWER_CHARS := "abcdefghijklmnopqrstuvwxyz"
+const ALPHA_CHARS := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+const ASSETS_PATH := "res://assets/"
+const TEXT_FILE_TYPES := ["txt", "ini", "sv", "md"]
+
+const TYPE_ERROR_MESSAGE := "Function does not support the given type."
 
 # ( General Utilities )
 
@@ -21,17 +39,38 @@ class BasicState extends Node2D:
 	var shapes: Array[Rect2]
 	var colors: Array[Color]
 
-	func _ready() -> void:
+	func _init() -> void:
 		z_index = 999
+		for c: String in DIGIT_CHARS:
+			var event := InputEventKey.new()
+			@warning_ignore("int_as_enum_without_cast")
+			event.keycode = c.unicode_at(0)
+			InputMap.add_action(c)
+			InputMap.action_add_event(c, event)
+		for c: String in UPPER_CHARS:
+			var event := InputEventKey.new()
+			@warning_ignore("int_as_enum_without_cast")
+			event.keycode = c.unicode_at(0)
+			InputMap.add_action(c)
+			InputMap.action_add_event(c, event)
+			InputMap.add_action(c.to_lower())
+			InputMap.action_add_event(c.to_lower(), event)
+		var mouse_event1 := InputEventMouseButton.new()
+		mouse_event1.button_index = MOUSE_BUTTON_LEFT
+		InputMap.add_action("mouse_left")
+		InputMap.action_add_event("mouse_left", mouse_event1)
+		var mouse_event2 := InputEventMouseButton.new()
+		mouse_event2.button_index = MOUSE_BUTTON_RIGHT
+		InputMap.add_action("mouse_right")
+		InputMap.action_add_event("mouse_right", mouse_event2)
 
 	func _process(dt: float) -> void:
-		time = fmod((time + dt), float_max)
-		tick_count = (tick_count + 1) % int_max
-		queue_redraw()
+		time = fmod((time + dt), FLOAT_MAX)
+		tick_count = (tick_count + 1) % INT_MAX
+		if len(shapes) != 0: queue_redraw()
 
 	func _draw() -> void:
-		for i in range(len(shapes)):
-			draw_rect(shapes[i], colors[i])
+		for i: int in range(len(shapes)): draw_rect(shapes[i], colors[i])
 		shapes.clear()
 		colors.clear()
 
@@ -51,16 +90,15 @@ static func panic(message: String) -> void:
 	assert(0, message)
 
 static func enter(path: String) -> void:
-	basic_state.get_tree().change_scene(assets_path + path)
+	basic_state.get_tree().change_scene(ASSETS_PATH + path)
 
 static func read(path: String) -> Variant:
-	const kinds := ["txt", "ini", "sv", "md"]
-	for kind in kinds:
-		if (path.ends_with(kind)):
-			var file := FileAccess.open(assets_path + path, FileAccess.READ)
+	for type: String in TEXT_FILE_TYPES:
+		if (path.ends_with(type)):
+			var file := FileAccess.open(ASSETS_PATH + path, FileAccess.READ)
 			if file == null: return null
 			return file.get_as_text()
-	return load(assets_path + path)
+	return load(ASSETS_PATH + path)
 
 static func to_v2(value) -> Vector2:
 	if value is bool:
@@ -69,7 +107,7 @@ static func to_v2(value) -> Vector2:
 	elif is_number_type(value):
 		return Vector2(value, value)
 	else:
-		panic(type_error_message)
+		panic(TYPE_ERROR_MESSAGE)
 		return Vector2()
 
 static func to_v3(value) -> Vector3:
@@ -79,7 +117,7 @@ static func to_v3(value) -> Vector3:
 	elif is_number_type(value):
 		return Vector3(value, value, value)
 	else:
-		panic(type_error_message)
+		panic(TYPE_ERROR_MESSAGE)
 		return Vector3()
 
 static func to_v4(value) -> Vector4:
@@ -89,7 +127,7 @@ static func to_v4(value) -> Vector4:
 	elif is_number_type(value):
 		return Vector4(value, value, value, value)
 	else:
-		panic(type_error_message)
+		panic(TYPE_ERROR_MESSAGE)
 		return Vector4()
 
 static func take_area(node: Sprite2D) -> Rect2:
@@ -124,12 +162,12 @@ static func move_to(from, to, delta) -> Variant:
 			else: result.y = to.y
 		return result
 	else:
-		panic(type_error_message)
+		panic(TYPE_ERROR_MESSAGE)
 		return 0.0
 
 static func move_to_with_slowdown(from, to, delta, slowdown) -> Variant:
 	if not (slowdown is float):
-		panic(type_error_message)
+		panic(TYPE_ERROR_MESSAGE)
 		return 0.0
 
 	if from is float and to is float and delta is float:
@@ -147,7 +185,7 @@ static func move_to_with_slowdown(from, to, delta, slowdown) -> Variant:
 			result.w = move_to_with_slowdown(from.w, to.w, delta.w, slowdown)
 		return result
 	else:
-		panic(type_error_message)
+		panic(TYPE_ERROR_MESSAGE)
 		return 0.0
 
 static func follow_position(object, to, delta) -> void:
@@ -189,36 +227,35 @@ static func mouse_screen_position() -> Vector2:
 static func mouse_world_position() -> Vector2:
 	return basic_state.get_global_mouse_position()
 
-static func is_pressed(key: String) -> bool:
-	if len(key) != 1:
-		panic("String is not a valid key. Length must be 1.")
-		return false
-	var target := key.to_upper().unicode_at(0)
-	return Input.is_physical_key_pressed(target)
+static func is_pressed(action: String) -> bool:
+	return Input.is_action_pressed(action)
+
+static func is_just_pressed(action: String) -> bool:
+	return Input.is_action_just_pressed(action)
+
+static func is_released(action: String) -> bool:
+	return Input.is_action_just_released(action)
 
 static func wasd() -> Vector2:
 	var result := Vector2()
-	if is_pressed("w") or Input.is_action_pressed("ui_up"): result.y += -1
-	if is_pressed("a") or Input.is_action_pressed("ui_left"): result.x += -1
-	if is_pressed("s") or Input.is_action_pressed("ui_down"): result.y += 1
-	if is_pressed("d") or Input.is_action_pressed("ui_right"): result.x += 1
+	if is_pressed("w") or is_pressed("ui_up"): result.y += -1
+	if is_pressed("a") or is_pressed("ui_left"): result.x += -1
+	if is_pressed("s") or is_pressed("ui_down"): result.y += 1
+	if is_pressed("d") or is_pressed("ui_right"): result.x += 1
 	return result
 
 static func draw_rect(shape: Rect2, color: Color) -> void:
 	basic_state.shapes.append(shape)
 	basic_state.colors.append(color)
 
-static func add_node(node) -> Variant:
-	basic_state.add_child(node)
-	if node is Node2D:
-		node.z_as_relative = false
-	return node
-
 static func add_child(node, to) -> Variant:
 	to.add_child(node)
 	if node is Node2D:
 		node.z_as_relative = false
 	return node
+
+static func add_node(node) -> Variant:
+	return add_child(node, basic_state)
 
 # ( Sprite Animation )
 
@@ -283,8 +320,20 @@ class Sprite extends Sprite2D:
 	func follow_position(to: Vector2, delta: Vector2) -> void:
 		position = SashimiBasic.move_to(position, to, delta)
 
+	func follow_rotation(to: float, delta: float) -> void:
+		rotation = SashimiBasic.move_to(rotation, to, delta)
+
+	func follow_scale(to: Vector2, delta: Vector2) -> void:
+		scale = SashimiBasic.move_to(scale, to, delta)
+
 	func follow_position_with_slowdown(to: Vector2, delta: Vector2, slowdown: float) -> void:
 		position = SashimiBasic.move_to_with_slowdown(position, to, delta, slowdown)
+
+	func follow_rotation_with_slowdown(to: float, delta: float, slowdown: float) -> void:
+		rotation = SashimiBasic.move_to_with_slowdown(rotation, to, delta, slowdown)
+
+	func follow_scale_with_slowdown(to: Vector2, delta: Vector2, slowdown: float) -> void:
+		scale = SashimiBasic.move_to_with_slowdown(scale, to, delta, slowdown)
 
 static func make_animated_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
 	var result := Sprite.new()
@@ -296,8 +345,8 @@ static func make_animated_sprite(path: String, width: int, height: int, atlas_le
 	result.texture = read(path)
 	return result
 
-static func add_animated_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
-	return add_node(make_animated_sprite(path, width, height, atlas_left, atlas_top, animation))
+static func make_sliced_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
+	return make_animated_sprite(path, width, height, atlas_left, atlas_top, null)
 
 static func make_sprite(path: String) -> Sprite:
 	var result := make_animated_sprite(path, 0, 0, 0, 0, null)
@@ -305,8 +354,28 @@ static func make_sprite(path: String) -> Sprite:
 	result.height = result.texture.get_height()
 	return result
 
+static func add_animated_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
+	return add_node(make_animated_sprite(path, width, height, atlas_left, atlas_top, animation))
+
+static func add_sliced_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
+	return add_node(make_sliced_sprite(path, width, height, atlas_left, atlas_top))
+
 static func add_sprite(path: String) -> Sprite:
 	return add_node(make_sprite(path))
+
+# ( GUI )
+
+# TODO: Will be funny if it works.
+static func button(area: Rect2) -> bool:
+	# Update.
+	var is_hot := area.has_point(mouse_screen_position())
+	var is_active := is_hot and is_pressed("mouse_left")
+	var is_clicked := is_hot and is_just_pressed("mouse_left")
+	# Draw.
+	if is_active: draw_rect(area, GRAY2)
+	elif is_hot: draw_rect(area, GRAY4)
+	else: draw_rect(area, GRAY3)
+	return is_clicked
 
 # ( Error Handling )
 

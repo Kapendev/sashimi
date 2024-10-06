@@ -16,9 +16,13 @@ func _ready() -> void:
 	sprite = basic.add_sprite("../icon.svg")
 
 func _process(dt: float) -> void:
-	if basic.is_pressed("1"): basic.quit()
-	if basic.is_pressed("2"): basic.panic("An error occurred.")
-	sprite.follow_position_with_slowdown(basic.mouse_screen_position(), basic.to_v2(dt), 0.3)
+	if basic.is_just_pressed("q"): basic.quit()
+	basic.draw_rect(Rect2(32, 32, 32, 32), Color.SKY_BLUE)
+	sprite.follow_position_with_slowdown(
+		basic.mouse_screen_position(),
+		basic.to_v2(dt),
+		0.3,
+	)
 ```
 
 > [!WARNING]
