@@ -74,10 +74,10 @@ class BasicState extends Node2D:
 		shapes.clear()
 		colors.clear()
 
-static func is_number_type(value) -> bool:
+static func is_number_type(value: Variant) -> bool:
 	return value is int or value is float
 
-static func is_vector_type(value) -> bool:
+static func is_vector_type(value: Variant) -> bool:
 	return value is Vector2 or value is Vector3 or value is Vector4
 
 static func quit() -> void:
@@ -100,7 +100,7 @@ static func read(path: String) -> Variant:
 			return file.get_as_text()
 	return load(ASSETS_PATH + path)
 
-static func to_v2(value) -> Vector2:
+static func to_v2(value: Variant) -> Vector2:
 	if value is bool:
 		var temp := 1 if value else 0
 		return Vector2(temp, temp)
@@ -110,7 +110,7 @@ static func to_v2(value) -> Vector2:
 		panic(TYPE_ERROR_MESSAGE)
 		return Vector2()
 
-static func to_v3(value) -> Vector3:
+static func to_v3(value: Variant) -> Vector3:
 	if value is bool:
 		var temp := 1 if value else 0
 		return Vector3(temp, temp, temp)
@@ -120,7 +120,7 @@ static func to_v3(value) -> Vector3:
 		panic(TYPE_ERROR_MESSAGE)
 		return Vector3()
 
-static func to_v4(value) -> Vector4:
+static func to_v4(value: Variant) -> Vector4:
 	if value is bool:
 		var temp := 1 if value else 0
 		return Vector4(temp, temp, temp, temp)
@@ -143,13 +143,13 @@ static func has_point(node: Sprite2D, point: Vector2) -> bool:
 static func has_area(node: Sprite2D, area: Rect2) -> bool:
 	return take_area(node).intersects(area)
 
-static func move_to(from, to, delta) -> Variant:
+static func move_to(from: Variant, to: Variant, delta: Variant) -> Variant:
 	if from is float and to is float and delta is float:
 		if abs(to - from) > abs(delta): return from + sign(to - from) * delta
 		else: return to
 	elif is_vector_type(from) and is_vector_type(to) and is_vector_type(delta):
-		var result = from
-		var offset = from.direction_to(to) * delta
+		var result: Variant = from
+		var offset: Variant = from.direction_to(to) * delta
 		if abs(to.x - from.x) > abs(offset.x): result.x = from.x + offset.x
 		else: result.x = to.x
 		if abs(to.y - from.y) > abs(offset.y): result.y = from.y + offset.y
@@ -165,18 +165,14 @@ static func move_to(from, to, delta) -> Variant:
 		panic(TYPE_ERROR_MESSAGE)
 		return 0.0
 
-static func move_to_with_slowdown(from, to, delta, slowdown) -> Variant:
-	if not (slowdown is float):
-		panic(TYPE_ERROR_MESSAGE)
-		return 0.0
-
+static func move_to_with_slowdown(from: Variant, to: Variant, delta: Variant, slowdown: float) -> Variant:
 	if from is float and to is float and delta is float:
 		if slowdown <= 0.0 or is_equal_approx(from, to): return to
-		var target = ((from * (slowdown - 1.0)) + to) / slowdown
-		var offset = target - from
+		var target: float = ((from * (slowdown - 1.0)) + to) / slowdown
+		var offset: float = target - from
 		return from + offset * delta
 	elif is_vector_type(from) and is_vector_type(to) and is_vector_type(delta):
-		var result = from
+		var result: Variant = from
 		result.x = move_to_with_slowdown(from.x, to.x, delta.x, slowdown)
 		result.y = move_to_with_slowdown(from.y, to.y, delta.y, slowdown)
 		if from is Vector3:
@@ -188,22 +184,22 @@ static func move_to_with_slowdown(from, to, delta, slowdown) -> Variant:
 		panic(TYPE_ERROR_MESSAGE)
 		return 0.0
 
-static func follow_position(object, to, delta) -> void:
+static func follow_position(object: Variant, to: Variant, delta: Variant) -> void:
 	object.position = move_to(object.position, to, delta)
 
-static func follow_rotation(object, to, delta) -> void:
+static func follow_rotation(object: Variant, to: Variant, delta: Variant) -> void:
 	object.rotation = move_to(object.rotation, to, delta)
 
-static func follow_scale(object, to, delta) -> void:
+static func follow_scale(object: Variant, to: Variant, delta: Variant) -> void:
 	object.scale = move_to(object.scale, to, delta)
 
-static func follow_position_with_slowdown(object, to, delta, slowdown) -> void:
+static func follow_position_with_slowdown(object: Variant, to: Variant, delta: Variant, slowdown: float) -> void:
 	object.position = move_to_with_slowdown(object.position, to, delta, slowdown)
 
-static func follow_rotation_with_slowdown(object, to, delta, slowdown) -> void:
+static func follow_rotation_with_slowdown(object: Variant, to: Variant, delta: Variant, slowdown: float) -> void:
 	object.rotation = move_to_with_slowdown(object.rotation, to, delta, slowdown)
 
-static func follow_scale_with_slowdown(object, to, delta, slowdown) -> void:
+static func follow_scale_with_slowdown(object: Variant, to: Variant, delta: Variant, slowdown: float) -> void:
 	object.scale = move_to_with_slowdown(object.scale, to, delta, slowdown)
 
 static func elapsed_time() -> float:
@@ -248,13 +244,13 @@ static func draw_rect(shape: Rect2, color: Color) -> void:
 	basic_state.shapes.append(shape)
 	basic_state.colors.append(color)
 
-static func add_child(node, to) -> Variant:
+static func add_child(node: Node, to: Node) -> Variant:
 	to.add_child(node)
 	if node is Node2D:
 		node.z_as_relative = false
 	return node
 
-static func add_node(node) -> Variant:
+static func add_node(node: Node) -> Variant:
 	return add_child(node, basic_state)
 
 # ( Sprite Animation )
@@ -372,15 +368,25 @@ static func add_sprite(path: String) -> Sprite:
 # ( GUI )
 
 # TODO: Will be funny if it works.
-static func button(area: Rect2) -> bool:
+static func button(object: Variant) -> bool:
+	var is_rect := true
+	var area := Rect2()
+	if object is Rect2:
+		area = object
+	elif object is Sprite2D:
+		area = take_area(object)
+		is_rect = false
+	else:
+		panic(TYPE_ERROR_MESSAGE)
 	# Update.
 	var is_hot := area.has_point(mouse_screen_position())
 	var is_active := is_hot and is_pressed("mouse_left")
 	var is_clicked := is_hot and is_just_pressed("mouse_left")
 	# Draw.
-	if is_active: draw_rect(area, GRAY2)
-	elif is_hot: draw_rect(area, GRAY4)
-	else: draw_rect(area, GRAY3)
+	if is_rect:
+		if is_active: draw_rect(area, GRAY2)
+		elif is_hot: draw_rect(area, GRAY4)
+		else: draw_rect(area, GRAY3)
 	return is_clicked
 
 # ( Error Handling )
@@ -403,7 +409,7 @@ class Result extends RefCounted:
 	func take_or() -> Variant:
 		return value
 
-static func some(value) -> Result:
+static func some(value: Variant) -> Result:
 	var result := Result.new()
 	result.value = value
 	return result
