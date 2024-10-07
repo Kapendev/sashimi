@@ -26,10 +26,11 @@ const UPPER_CHARS := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const LOWER_CHARS := "abcdefghijklmnopqrstuvwxyz"
 const ALPHA_CHARS := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
+const TYPE_ERROR_MESSAGE := "Function does not support the given type."
+const MAP_ERROR_MESSAGE := "Tile does not exist."
+
 const ASSETS_PATH := "res://assets/"
 const TEXT_FILE_TYPES := ["txt", "ini", "sv", "md"]
-
-const TYPE_ERROR_MESSAGE := "Function does not support the given type."
 
 # ( General Utilities )
 
@@ -364,6 +365,63 @@ static func add_sliced_sprite(path: String, width: int, height: int, atlas_left:
 
 static func add_sprite(path: String) -> Sprite:
 	return add_node(make_sprite(path))
+
+# ( Tile Map )
+
+class Map extends Node2D:
+	var tiles: Array[int]
+	var tile_width: int
+	var tile_height: int
+	var texture: Texture2D
+	const row_count := 128
+	const col_count := 128
+
+	# TODO: Was testing stuff.
+	func _draw() -> void:
+		var texture_grid_width := texture.get_width() / tile_width
+		var texture_grid_height := texture.get_height() / tile_height
+		if texture_grid_width == 0 or texture_grid_height == 0: return
+		var i := 0
+		for tile in tiles:
+			if tile == -1:
+				i += 1
+				continue
+			var texture_grid_row := tile / texture_grid_width
+			var texture_grid_col := tile % texture_grid_height
+			var texture_area := Rect2(texture_grid_col * tile_width, texture_grid_row * tile_height, tile_width, tile_height)
+			var map_grid_row := i / col_count
+			var map_grid_col := i % col_count
+			var map_area := Rect2(map_grid_col * tile_width, map_grid_row * tile_height, tile_width, tile_height)
+			draw_texture_rect_region(texture, map_area, texture_area, modulate)
+			i += 1
+
+	func has(row: int, col: int) -> bool:
+		return row >= 0 and row < row_count and col >= 0 and col < col_count
+
+	func take(row: int, col: int) -> int:
+		if not has(row, col): SashimiBasic.panic(MAP_ERROR_MESSAGE)
+		return tiles[col_count * row + col]
+
+	func put(row: int, col: int, value: int) -> void:
+		if not has(row, col): SashimiBasic.panic(MAP_ERROR_MESSAGE)
+		tiles[col_count * row + col] = value
+		queue_redraw()
+
+	func length() -> int:
+		return len(tiles)
+
+static func make_map(texture_path: String, tile_width: int, tile_height: int) -> Map:
+	var result := Map.new()
+	result.tile_width = tile_width
+	result.tile_height = tile_height
+	result.texture = read(texture_path)
+	result.tiles = []
+	for i: int in range(result.row_count * result.col_count):
+		result.tiles.append(-1)
+	return result
+
+static func add_map(texture_path: String, tile_width: int, tile_height: int) -> Map:
+	return add_node(make_map(texture_path, tile_width, tile_height))
 
 # ( GUI )
 
