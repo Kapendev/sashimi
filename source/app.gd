@@ -22,20 +22,16 @@ func _ready() -> void:
 	animation2 = basic.make_sprite_animation(1, 2, 4)
 	sprite = basic.add_animated_sprite("../icon.svg", 64, 64, 0, 0, animation1)
 
-	map = basic.add_map("../icon.svg", 32, 32)
+	map = basic.add_map("../icon.svg", 4, 4, 32, 32)
 
 func _process(dt: float) -> void:
-	if basic.is_just_pressed("q"): basic.quit()
+	if basic.is_just_pressed("esc"): basic.quit()
 
 	if basic.is_just_pressed("1"):
 		map.put(0, 0, 0)
 		map.put(0, 1, 1)
 		map.put(0, 2, 2)
 		map.put(0, 3, 3)
-		map.put(1, 0, 4)
-		map.put(1, 1, 5)
-		map.put(1, 2, 6)
-		map.put(1, 3, 7)
 
 	var slowdown := 0.3
 	var position_value := basic.mouse_world_position()

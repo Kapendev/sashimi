@@ -42,28 +42,33 @@ class BasicState extends Node2D:
 
 	func _init() -> void:
 		z_index = 999
-		for c: String in DIGIT_CHARS:
-			var event := InputEventKey.new()
-			@warning_ignore("int_as_enum_without_cast")
-			event.keycode = c.unicode_at(0)
-			InputMap.add_action(c)
-			InputMap.action_add_event(c, event)
-		for c: String in UPPER_CHARS:
-			var event := InputEventKey.new()
-			@warning_ignore("int_as_enum_without_cast")
-			event.keycode = c.unicode_at(0)
-			InputMap.add_action(c)
-			InputMap.action_add_event(c, event)
-			InputMap.add_action(c.to_lower())
-			InputMap.action_add_event(c.to_lower(), event)
-		var mouse_event1 := InputEventMouseButton.new()
-		mouse_event1.button_index = MOUSE_BUTTON_LEFT
-		InputMap.add_action("mouse_left")
-		InputMap.action_add_event("mouse_left", mouse_event1)
-		var mouse_event2 := InputEventMouseButton.new()
-		mouse_event2.button_index = MOUSE_BUTTON_RIGHT
-		InputMap.add_action("mouse_right")
-		InputMap.action_add_event("mouse_right", mouse_event2)
+		if not InputMap.has_action("0"):
+			for c: String in DIGIT_CHARS:
+				var event := InputEventKey.new()
+				@warning_ignore("int_as_enum_without_cast")
+				event.keycode = c.unicode_at(0)
+				InputMap.add_action(c)
+				InputMap.action_add_event(c, event)
+			for c: String in UPPER_CHARS:
+				var event := InputEventKey.new()
+				@warning_ignore("int_as_enum_without_cast")
+				event.keycode = c.unicode_at(0)
+				InputMap.add_action(c)
+				InputMap.action_add_event(c, event)
+				InputMap.add_action(c.to_lower())
+				InputMap.action_add_event(c.to_lower(), event)
+			var esc_event := InputEventKey.new()
+			esc_event.keycode = KEY_ESCAPE
+			InputMap.add_action("esc")
+			InputMap.action_add_event("esc", esc_event)
+			var mouse_event1 := InputEventMouseButton.new()
+			mouse_event1.button_index = MOUSE_BUTTON_LEFT
+			InputMap.add_action("mouse_left")
+			InputMap.action_add_event("mouse_left", mouse_event1)
+			var mouse_event2 := InputEventMouseButton.new()
+			mouse_event2.button_index = MOUSE_BUTTON_RIGHT
+			InputMap.add_action("mouse_right")
+			InputMap.action_add_event("mouse_right", mouse_event2)
 
 	func _process(dt: float) -> void:
 		time = fmod((time + dt), FLOAT_MAX)
@@ -369,31 +374,38 @@ static func add_sprite(path: String) -> Sprite:
 # ( Tile Map )
 
 class Map extends Node2D:
-	var tiles: Array[int]
+	var tiles: PackedInt32Array
 	var tile_width: int
 	var tile_height: int
+	var row_count: int
+	var col_count: int
 	var texture: Texture2D
-	const row_count := 128
-	const col_count := 128
+	const max_row_count := 128
+	const max_col_count := 128
 
-	# TODO: Was testing stuff.
+	# TODO: Maybe make it work with a camera.
 	func _draw() -> void:
-		var texture_grid_width := texture.get_width() / tile_width
-		var texture_grid_height := texture.get_height() / tile_height
+		var texture_grid_width := int(texture.get_width() / float(tile_width))
+		var texture_grid_height := int(texture.get_height() / float(tile_height))
 		if texture_grid_width == 0 or texture_grid_height == 0: return
 		var i := 0
 		for tile in tiles:
+			if i == length():
+				break
 			if tile == -1:
 				i += 1
 				continue
-			var texture_grid_row := tile / texture_grid_width
+			var texture_grid_row := int(tile / float(texture_grid_width))
 			var texture_grid_col := tile % texture_grid_height
 			var texture_area := Rect2(texture_grid_col * tile_width, texture_grid_row * tile_height, tile_width, tile_height)
-			var map_grid_row := i / col_count
+			var map_grid_row := int(i / float(col_count))
 			var map_grid_col := i % col_count
 			var map_area := Rect2(map_grid_col * tile_width, map_grid_row * tile_height, tile_width, tile_height)
 			draw_texture_rect_region(texture, map_area, texture_area, modulate)
 			i += 1
+
+	func length() -> int:
+		return row_count * col_count
 
 	func has(row: int, col: int) -> bool:
 		return row >= 0 and row < row_count and col >= 0 and col < col_count
@@ -407,21 +419,26 @@ class Map extends Node2D:
 		tiles[col_count * row + col] = value
 		queue_redraw()
 
-	func length() -> int:
-		return len(tiles)
+	# TODO: Not done yet.
+	func parse(path: String) -> void:
+		var text: String = SashimiBasic.read(path)
+		for line in text.rsplit("\n"):
+			print(line)
 
-static func make_map(texture_path: String, tile_width: int, tile_height: int) -> Map:
+static func make_map(texture_path: String, row_count: int, col_count: int, tile_width: int, tile_height: int) -> Map:
 	var result := Map.new()
 	result.tile_width = tile_width
 	result.tile_height = tile_height
+	result.row_count = row_count
+	result.col_count = col_count
 	result.texture = read(texture_path)
 	result.tiles = []
-	for i: int in range(result.row_count * result.col_count):
-		result.tiles.append(-1)
+	for i: int in range(result.max_row_count * result.max_col_count):
+		result.tiles.append(1)
 	return result
 
-static func add_map(texture_path: String, tile_width: int, tile_height: int) -> Map:
-	return add_node(make_map(texture_path, tile_width, tile_height))
+static func add_map(texture_path: String, row_count: int, col_count: int, tile_width: int, tile_height: int) -> Map:
+	return add_node(make_map(texture_path, row_count, col_count, tile_width, tile_height))
 
 # ( GUI )
 
