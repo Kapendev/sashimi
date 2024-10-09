@@ -434,7 +434,7 @@ static func make_map(texture_path: String, row_count: int, col_count: int, tile_
 	result.texture = read(texture_path)
 	result.tiles = []
 	for i: int in range(result.max_row_count * result.max_col_count):
-		result.tiles.append(1)
+		result.tiles.append(-1)
 	return result
 
 static func add_map(texture_path: String, row_count: int, col_count: int, tile_width: int, tile_height: int) -> Map:

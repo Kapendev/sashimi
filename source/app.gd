@@ -25,8 +25,7 @@ func _ready() -> void:
 	map = basic.add_map("../icon.svg", 4, 4, 32, 32)
 
 func _process(dt: float) -> void:
-	if basic.is_just_pressed("esc"): basic.quit()
-
+	if basic.is_just_pressed("q"): basic.quit()
 	if basic.is_just_pressed("1"):
 		map.put(0, 0, 0)
 		map.put(0, 1, 1)
