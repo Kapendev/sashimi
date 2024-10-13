@@ -39,13 +39,15 @@ class CoreState extends Node2D:
 	var tick_count: int
 	var shapes: Array[Rect2]
 	var colors: Array[Color]
-	var current_scene: Node
 	var assets_path: String
+	var current_scene: Node
 
 	func _ready() -> void:
 		assets_path = DEFAULT_ASSETS_PATH
 		z_index = 999
-		SashimiCore.enter(Node.new())
+		var scene := Node.new()
+		scene.name = "first"
+		SashimiCore.change_scene(scene)
 		if not InputMap.has_action("0"):
 			for c: String in DIGIT_CHARS:
 				var event := InputEventKey.new()
@@ -99,7 +101,10 @@ static func panic(message: String) -> void:
 	@warning_ignore("assert_always_false")
 	assert(0, message)
 
-static func enter(scene: Variant) -> void:
+static func current_scene() -> Node:
+	return core_state.current_scene
+
+static func change_scene(scene: Variant) -> void:
 	if core_state.current_scene != null: core_state.current_scene.queue_free()
 	if scene is PackedScene: core_state.current_scene = scene.instantiate()
 	elif scene is Node: core_state.current_scene = scene
@@ -389,8 +394,10 @@ class Map extends Node2D:
 	var tile_width: int
 	var tile_height: int
 	var texture: Texture2D
-	const row_count := 128
-	const col_count := 128
+	var estimated_max_row_count: int
+	var estimated_max_col_count: int
+	const max_row_count := 128
+	const max_col_count := 128
 
 	# TODO: Maybe make it work with a camera.
 	func _draw() -> void:
@@ -407,32 +414,44 @@ class Map extends Node2D:
 			var texture_grid_row := int(tile / float(texture_grid_width))
 			var texture_grid_col := tile % texture_grid_height
 			var texture_area := Rect2(texture_grid_col * tile_width, texture_grid_row * tile_height, tile_width, tile_height)
-			var map_grid_row := int(i / float(col_count))
-			var map_grid_col := i % col_count
+			var map_grid_row := int(i / float(max_col_count))
+			var map_grid_col := i % max_col_count
 			var map_area := Rect2(map_grid_col * tile_width, map_grid_row * tile_height, tile_width, tile_height)
 			draw_texture_rect_region(texture, map_area, texture_area, modulate)
 			i += 1
 
 	func length() -> int:
-		return row_count * col_count
+		return max_row_count * max_col_count
 
 	func has(row: int, col: int) -> bool:
-		return row >= 0 and row < row_count and col >= 0 and col < col_count
+		return row >= 0 and row < max_row_count and col >= 0 and col < max_col_count
 
 	func take(row: int, col: int) -> int:
 		if not has(row, col): SashimiCore.panic(MAP_ERROR_MESSAGE)
-		return tiles[col_count * row + col]
+		return tiles[max_col_count * row + col]
 
 	func put(value: int, row: int, col: int) -> void:
 		if not has(row, col): SashimiCore.panic(MAP_ERROR_MESSAGE)
-		tiles[col_count * row + col] = value
+		tiles[max_col_count * row + col] = value
 		queue_redraw()
 
+	func fill(value: int) -> void:
+		for i in range(0, len(tiles)):
+			tiles[i] = value
+
 	# TODO: Not done yet.
-	func parse(path: String) -> void:
-		var text: String = SashimiCore.read(path)
-		for line in text.rsplit("\n"):
-			print(line)
+	func parse(csv: String) -> void:
+		fill(-1)
+		estimated_max_row_count = 0
+		estimated_max_col_count = 0
+		for line: String in csv.rsplit("\n"):
+			if len(line) == 0: continue
+			estimated_max_row_count += 1
+			estimated_max_col_count = 0
+			for value: String in line.rsplit(","):
+				estimated_max_col_count += 1
+				if value.is_valid_int(): put(value.to_int(), estimated_max_row_count - 1, estimated_max_col_count - 1)
+				else: return
 
 static func make_map(texture: Texture2D, tile_width: int, tile_height: int) -> Map:
 	var result := Map.new()
@@ -441,7 +460,7 @@ static func make_map(texture: Texture2D, tile_width: int, tile_height: int) -> M
 	result.tile_height = tile_height
 	result.texture = texture
 	result.tiles = []
-	for i: int in range(result.row_count * result.col_count):
+	for i: int in range(result.max_row_count * result.max_col_count):
 		result.tiles.append(-1)
 	return result
 
