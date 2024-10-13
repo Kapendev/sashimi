@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://bt0uworkmvn6l"]
 
-[ext_resource type="Script" path="res://source/app.gd" id="1_67k74"]
+[ext_resource type="Script" path="res://source/app.gd" id="1_iw42w"]
 
 [node name="app" type="Node"]
-script = ExtResource("1_67k74")
+script = ExtResource("1_iw42w")

@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://lbd7aa2xub4s"]
+
+[node name="scene" type="Node"]
+
+[node name="label" type="Label" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -640.0
+offset_top = -360.0
+offset_right = -640.0
+offset_bottom = -360.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(2, 2)
+size_flags_horizontal = 4
+text = "I am a random scene."
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/_edit_lock_ = true

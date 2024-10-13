@@ -7,14 +7,14 @@
 # ---
 
 extends RefCounted
-class_name SashimiBasic
+class_name SashimiCore
 
-static var basic_state: BasicState
+static var core_state: CoreState
 
-const INT_MIN   := -9223372036854775808
-const INT_MAX   := 9223372036854775807
-const FLOAT_MIN := -1.79769e308
-const FLOAT_MAX := 1.79769e308
+const MIN_INT   := -9223372036854775808
+const MAX_INT   := 9223372036854775807
+const MIN_FLOAT := -1.79769e308
+const MAX_FLOAT := 1.79769e308
 
 const GRAY1 := Color("202020")
 const GRAY2 := Color("606060")
@@ -29,19 +29,23 @@ const ALPHA_CHARS := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 const TYPE_ERROR_MESSAGE := "Function does not support the given type."
 const MAP_ERROR_MESSAGE := "Tile does not exist."
 
-const ASSETS_PATH := "res://assets/"
+const DEFAULT_ASSETS_PATH := "res://assets/"
 const TEXT_FILE_TYPES := ["txt", "ini", "sv", "md"]
 
 # ( General Utilities )
 
-class BasicState extends Node2D:
+class CoreState extends Node2D:
 	var time: float
 	var tick_count: int
 	var shapes: Array[Rect2]
 	var colors: Array[Color]
+	var current_scene: Node
+	var assets_path: String
 
-	func _init() -> void:
+	func _ready() -> void:
+		assets_path = DEFAULT_ASSETS_PATH
 		z_index = 999
+		SashimiCore.enter(Node.new())
 		if not InputMap.has_action("0"):
 			for c: String in DIGIT_CHARS:
 				var event := InputEventKey.new()
@@ -71,8 +75,8 @@ class BasicState extends Node2D:
 			InputMap.action_add_event("mouse_right", mouse_event2)
 
 	func _process(dt: float) -> void:
-		time = fmod((time + dt), FLOAT_MAX)
-		tick_count = (tick_count + 1) % INT_MAX
+		time = fmod((time + dt), MAX_FLOAT)
+		tick_count = (tick_count + 1) % MAX_INT
 		if len(shapes) != 0: queue_redraw()
 
 	func _draw() -> void:
@@ -87,7 +91,7 @@ static func is_vector_type(value: Variant) -> bool:
 	return value is Vector2 or value is Vector3 or value is Vector4
 
 static func quit() -> void:
-	basic_state.get_tree().quit()
+	core_state.get_tree().quit()
 
 static func panic(message: String) -> void:
 	print(message)
@@ -95,16 +99,27 @@ static func panic(message: String) -> void:
 	@warning_ignore("assert_always_false")
 	assert(0, message)
 
-static func enter(path: String) -> void:
-	basic_state.get_tree().change_scene(ASSETS_PATH + path)
+static func enter(scene: Variant) -> void:
+	if core_state.current_scene != null: core_state.current_scene.queue_free()
+	if scene is PackedScene: core_state.current_scene = scene.instantiate()
+	elif scene is Node: core_state.current_scene = scene
+	else: panic(TYPE_ERROR_MESSAGE)
+	add_child(core_state.current_scene, core_state)
 
+static func print_current_scene() -> void:
+	print(core_state.current_scene.name, ":")
+	for child in core_state.current_scene.get_children():
+		print("  ", child.name)
+
+# TODO: Think about it. I only use it for text files. Also assets path in Godot is maybe weird.
+# NOTE: There is also this thing about exporting and not including some files...
 static func read(path: String) -> Variant:
 	for type: String in TEXT_FILE_TYPES:
 		if (path.ends_with(type)):
-			var file := FileAccess.open(ASSETS_PATH + path, FileAccess.READ)
+			var file := FileAccess.open(core_state.assets_path + path, FileAccess.READ)
 			if file == null: return null
 			return file.get_as_text()
-	return load(ASSETS_PATH + path)
+	return load(core_state.assets_path + path)
 
 static func to_v2(value: Variant) -> Vector2:
 	if value is bool:
@@ -191,43 +206,49 @@ static func move_to_with_slowdown(from: Variant, to: Variant, delta: Variant, sl
 		return 0.0
 
 static func follow_position(object: Variant, to: Variant, delta: Variant) -> void:
+	if object == null: return
 	object.position = move_to(object.position, to, delta)
 
 static func follow_rotation(object: Variant, to: Variant, delta: Variant) -> void:
+	if object == null: return
 	object.rotation = move_to(object.rotation, to, delta)
 
 static func follow_scale(object: Variant, to: Variant, delta: Variant) -> void:
+	if object == null: return
 	object.scale = move_to(object.scale, to, delta)
 
 static func follow_position_with_slowdown(object: Variant, to: Variant, delta: Variant, slowdown: float) -> void:
+	if object == null: return
 	object.position = move_to_with_slowdown(object.position, to, delta, slowdown)
 
 static func follow_rotation_with_slowdown(object: Variant, to: Variant, delta: Variant, slowdown: float) -> void:
+	if object == null: return
 	object.rotation = move_to_with_slowdown(object.rotation, to, delta, slowdown)
 
 static func follow_scale_with_slowdown(object: Variant, to: Variant, delta: Variant, slowdown: float) -> void:
+	if object == null: return
 	object.scale = move_to_with_slowdown(object.scale, to, delta, slowdown)
 
 static func elapsed_time() -> float:
-	return basic_state.time
+	return core_state.time
 
 static func elapsed_tick_count() -> float:
-	return basic_state.tick_count
+	return core_state.tick_count
 
 static func resolution_width() -> int:
-	return basic_state.get_tree().get_root().content_scale_size.x
+	return core_state.get_tree().get_root().content_scale_size.x
 
 static func resolution_height() -> int:
-	return basic_state.get_tree().get_root().content_scale_size.y
+	return core_state.get_tree().get_root().content_scale_size.y
 
 static func resolution() -> Vector2:
-	return basic_state.get_tree().get_root().content_scale_size
+	return core_state.get_tree().get_root().content_scale_size
 
 static func mouse_screen_position() -> Vector2:
-	return basic_state.get_viewport().get_mouse_position()
+	return core_state.get_viewport().get_mouse_position()
 
 static func mouse_world_position() -> Vector2:
-	return basic_state.get_global_mouse_position()
+	return core_state.get_global_mouse_position()
 
 static func is_pressed(action: String) -> bool:
 	return Input.is_action_pressed(action)
@@ -247,17 +268,24 @@ static func wasd() -> Vector2:
 	return result
 
 static func draw_rect(shape: Rect2, color: Color) -> void:
-	basic_state.shapes.append(shape)
-	basic_state.colors.append(color)
+	core_state.shapes.append(shape)
+	core_state.colors.append(color)
+
+static func set_parent(node: Node) -> void:
+	core_state.current_scene = node
+
+static func reset_parent() -> void:
+	core_state.current_scene = core_state
 
 static func add_child(node: Node, to: Node) -> Variant:
-	to.add_child(node)
-	if node is Node2D:
-		node.z_as_relative = false
+	if node.name.is_empty(): node.name = "node"
+	else: node.name = node.name.to_lower()
+	if node is Node2D: node.z_as_relative = false
+	to.add_child(node, true)
 	return node
 
 static func add_node(node: Node) -> Variant:
-	return add_child(node, basic_state)
+	return add_child(node, core_state.current_scene)
 
 # ( Sprite Animation )
 
@@ -320,56 +348,39 @@ class Sprite extends Sprite2D:
 			animation = other
 
 	func has_point(point: Vector2) -> bool:
-		return SashimiBasic.has_point(self, point)
+		return SashimiCore.has_point(self, point)
 
 	func has_area(area: Rect2) -> bool:
-		return SashimiBasic.has_area(self, area)
+		return SashimiCore.has_area(self, area)
 
-	func follow_position(to: Vector2, delta: Vector2) -> void:
-		position = SashimiBasic.move_to(position, to, delta)
-
-	func follow_rotation(to: float, delta: float) -> void:
-		rotation = SashimiBasic.move_to(rotation, to, delta)
-
-	func follow_scale(to: Vector2, delta: Vector2) -> void:
-		scale = SashimiBasic.move_to(scale, to, delta)
-
-	func follow_position_with_slowdown(to: Vector2, delta: Vector2, slowdown: float) -> void:
-		position = SashimiBasic.move_to_with_slowdown(position, to, delta, slowdown)
-
-	func follow_rotation_with_slowdown(to: float, delta: float, slowdown: float) -> void:
-		rotation = SashimiBasic.move_to_with_slowdown(rotation, to, delta, slowdown)
-
-	func follow_scale_with_slowdown(to: Vector2, delta: Vector2, slowdown: float) -> void:
-		scale = SashimiBasic.move_to_with_slowdown(scale, to, delta, slowdown)
-
-static func make_animated_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
+static func make_animated_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
 	var result := Sprite.new()
+	result.name = "sprite"
 	result.width = width
 	result.height = height
 	result.atlas_left = atlas_left
 	result.atlas_top = atlas_top
 	result.animation = animation
-	result.texture = read(path)
+	result.texture = texture
 	return result
 
-static func make_sliced_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
-	return make_animated_sprite(path, width, height, atlas_left, atlas_top, null)
+static func make_sliced_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
+	return make_animated_sprite(texture, width, height, atlas_left, atlas_top, null)
 
-static func make_sprite(path: String) -> Sprite:
-	var result := make_animated_sprite(path, 0, 0, 0, 0, null)
+static func make_sprite(texture: Texture2D) -> Sprite:
+	var result := make_animated_sprite(texture, 0, 0, 0, 0, null)
 	result.width = result.texture.get_width()
 	result.height = result.texture.get_height()
 	return result
 
-static func add_animated_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
-	return add_node(make_animated_sprite(path, width, height, atlas_left, atlas_top, animation))
+static func add_animated_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
+	return add_node(make_animated_sprite(texture, width, height, atlas_left, atlas_top, animation))
 
-static func add_sliced_sprite(path: String, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
-	return add_node(make_sliced_sprite(path, width, height, atlas_left, atlas_top))
+static func add_sliced_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
+	return add_node(make_sliced_sprite(texture, width, height, atlas_left, atlas_top))
 
-static func add_sprite(path: String) -> Sprite:
-	return add_node(make_sprite(path))
+static func add_sprite(texture: Texture2D) -> Sprite:
+	return add_node(make_sprite(texture))
 
 # ( Tile Map )
 
@@ -377,11 +388,9 @@ class Map extends Node2D:
 	var tiles: PackedInt32Array
 	var tile_width: int
 	var tile_height: int
-	var row_count: int
-	var col_count: int
 	var texture: Texture2D
-	const max_row_count := 128
-	const max_col_count := 128
+	const row_count := 128
+	const col_count := 128
 
 	# TODO: Maybe make it work with a camera.
 	func _draw() -> void:
@@ -411,34 +420,33 @@ class Map extends Node2D:
 		return row >= 0 and row < row_count and col >= 0 and col < col_count
 
 	func take(row: int, col: int) -> int:
-		if not has(row, col): SashimiBasic.panic(MAP_ERROR_MESSAGE)
+		if not has(row, col): SashimiCore.panic(MAP_ERROR_MESSAGE)
 		return tiles[col_count * row + col]
 
-	func put(row: int, col: int, value: int) -> void:
-		if not has(row, col): SashimiBasic.panic(MAP_ERROR_MESSAGE)
+	func put(value: int, row: int, col: int) -> void:
+		if not has(row, col): SashimiCore.panic(MAP_ERROR_MESSAGE)
 		tiles[col_count * row + col] = value
 		queue_redraw()
 
 	# TODO: Not done yet.
 	func parse(path: String) -> void:
-		var text: String = SashimiBasic.read(path)
+		var text: String = SashimiCore.read(path)
 		for line in text.rsplit("\n"):
 			print(line)
 
-static func make_map(texture_path: String, row_count: int, col_count: int, tile_width: int, tile_height: int) -> Map:
+static func make_map(texture: Texture2D, tile_width: int, tile_height: int) -> Map:
 	var result := Map.new()
+	result.name = "map"
 	result.tile_width = tile_width
 	result.tile_height = tile_height
-	result.row_count = row_count
-	result.col_count = col_count
-	result.texture = read(texture_path)
+	result.texture = texture
 	result.tiles = []
-	for i: int in range(result.max_row_count * result.max_col_count):
+	for i: int in range(result.row_count * result.col_count):
 		result.tiles.append(-1)
 	return result
 
-static func add_map(texture_path: String, row_count: int, col_count: int, tile_width: int, tile_height: int) -> Map:
-	return add_node(make_map(texture_path, row_count, col_count, tile_width, tile_height))
+static func add_map(texture: Texture2D, tile_width: int, tile_height: int) -> Map:
+	return add_node(make_map(texture, tile_width, tile_height))
 
 # ( GUI )
 
@@ -478,7 +486,7 @@ class Result extends RefCounted:
 
 	func take() -> Variant:
 		if is_some():
-			SashimiBasic.panic("Fault `{0}` was detected.".format([fault]))
+			SashimiCore.panic("Fault `{0}` was detected.".format([fault]))
 		return value
 
 	func take_or() -> Variant:
@@ -497,13 +505,13 @@ static func none(fault := 1) -> Result:
 # ( Script )
 
 static func is_script_ready() -> bool:
-	return basic_state != null and basic_state.is_inside_tree()
+	return core_state != null
 
 static func ready_script(parent: Node) -> void:
-	if basic_state != null and basic_state.is_inside_tree(): return
-	basic_state = BasicState.new()
-	basic_state.name = "sashimi_basic_state"
-	parent.add_child(basic_state)
+	if is_script_ready(): return
+	core_state = CoreState.new()
+	core_state.name = "sashimi_core_state"
+	parent.add_child(core_state)
 
 static func test_script() -> void:
 	assert(none().is_none() == true);
