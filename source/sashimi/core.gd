@@ -10,6 +10,7 @@ extends RefCounted
 class_name SashimiCore
 
 static var core_state: CoreState
+static var result_buffer: Result
 
 const MIN_INT   := -9223372036854775808
 const MAX_INT   := 9223372036854775807
@@ -35,19 +36,16 @@ const TEXT_FILE_TYPES := ["txt", "ini", "sv", "md"]
 # ( General Utilities )
 
 class CoreState extends Node2D:
-	var time: float
-	var tick_count: int
+	var elapsed_time: float
+	var elapsed_tick_count: int
 	var shapes: Array[Rect2]
 	var colors: Array[Color]
 	var assets_path: String
-	var current_scene: Node
 
 	func _ready() -> void:
 		assets_path = DEFAULT_ASSETS_PATH
 		z_index = 999
-		var scene := Node.new()
-		scene.name = "first"
-		SashimiCore.change_scene(scene)
+		# Ready input keys.
 		if not InputMap.has_action("0"):
 			for c: String in DIGIT_CHARS:
 				var event := InputEventKey.new()
@@ -77,8 +75,8 @@ class CoreState extends Node2D:
 			InputMap.action_add_event("mouse_right", mouse_event2)
 
 	func _process(dt: float) -> void:
-		time = fmod((time + dt), MAX_FLOAT)
-		tick_count = (tick_count + 1) % MAX_INT
+		elapsed_time = fmod((elapsed_time + dt), MAX_FLOAT)
+		elapsed_tick_count = (elapsed_tick_count + 1) % MAX_INT
 		if len(shapes) != 0: queue_redraw()
 
 	func _draw() -> void:
@@ -101,21 +99,6 @@ static func panic(message: String) -> void:
 	@warning_ignore("assert_always_false")
 	assert(0, message)
 
-static func current_scene() -> Node:
-	return core_state.current_scene
-
-static func change_scene(scene: Variant) -> void:
-	if core_state.current_scene != null: core_state.current_scene.queue_free()
-	if scene is PackedScene: core_state.current_scene = scene.instantiate()
-	elif scene is Node: core_state.current_scene = scene
-	else: panic(TYPE_ERROR_MESSAGE)
-	add_child(core_state.current_scene, core_state)
-
-static func print_current_scene() -> void:
-	print(core_state.current_scene.name, ":")
-	for child in core_state.current_scene.get_children():
-		print("  ", child.name)
-
 # TODO: Think about it. I only use it for text files. Also assets path in Godot is maybe weird.
 # NOTE: There is also this thing about exporting and not including some files...
 static func read(path: String) -> Variant:
@@ -125,36 +108,6 @@ static func read(path: String) -> Variant:
 			if file == null: return null
 			return file.get_as_text()
 	return load(core_state.assets_path + path)
-
-static func to_v2(value: Variant) -> Vector2:
-	if value is bool:
-		var temp := 1 if value else 0
-		return Vector2(temp, temp)
-	elif is_number_type(value):
-		return Vector2(value, value)
-	else:
-		panic(TYPE_ERROR_MESSAGE)
-		return Vector2()
-
-static func to_v3(value: Variant) -> Vector3:
-	if value is bool:
-		var temp := 1 if value else 0
-		return Vector3(temp, temp, temp)
-	elif is_number_type(value):
-		return Vector3(value, value, value)
-	else:
-		panic(TYPE_ERROR_MESSAGE)
-		return Vector3()
-
-static func to_v4(value: Variant) -> Vector4:
-	if value is bool:
-		var temp := 1 if value else 0
-		return Vector4(temp, temp, temp, temp)
-	elif is_number_type(value):
-		return Vector4(value, value, value, value)
-	else:
-		panic(TYPE_ERROR_MESSAGE)
-		return Vector4()
 
 static func take_area(node: Sprite2D) -> Rect2:
 	var result := node.get_rect()
@@ -235,10 +188,10 @@ static func follow_scale_with_slowdown(object: Variant, to: Variant, delta: Vari
 	object.scale = move_to_with_slowdown(object.scale, to, delta, slowdown)
 
 static func elapsed_time() -> float:
-	return core_state.time
+	return core_state.elapsed_time
 
 static func elapsed_tick_count() -> float:
-	return core_state.tick_count
+	return core_state.elapsed_tick_count
 
 static func resolution_width() -> int:
 	return core_state.get_tree().get_root().content_scale_size.x
@@ -249,10 +202,10 @@ static func resolution_height() -> int:
 static func resolution() -> Vector2:
 	return core_state.get_tree().get_root().content_scale_size
 
-static func mouse_screen_position() -> Vector2:
+static func mouse() -> Vector2:
 	return core_state.get_viewport().get_mouse_position()
 
-static func mouse_world_position() -> Vector2:
+static func world_mouse() -> Vector2:
 	return core_state.get_global_mouse_position()
 
 static func is_pressed(action: String) -> bool:
@@ -266,21 +219,31 @@ static func is_released(action: String) -> bool:
 
 static func wasd() -> Vector2:
 	var result := Vector2()
-	if is_pressed("w") or is_pressed("ui_up"): result.y += -1
-	if is_pressed("a") or is_pressed("ui_left"): result.x += -1
-	if is_pressed("s") or is_pressed("ui_down"): result.y += 1
-	if is_pressed("d") or is_pressed("ui_right"): result.x += 1
+	result.y -= (is_pressed("w") or is_pressed("ui_up")) as int
+	result.x -= (is_pressed("a") or is_pressed("ui_left")) as int
+	result.y += (is_pressed("s") or is_pressed("ui_down")) as int
+	result.x += (is_pressed("d") or is_pressed("ui_right")) as int
+	return result
+
+static func wasd_just_pressed() -> Vector2:
+	var result := Vector2()
+	result.y -= (is_just_pressed("w") or is_just_pressed("ui_up")) as int
+	result.x -= (is_just_pressed("a") or is_just_pressed("ui_left")) as int
+	result.y += (is_just_pressed("s") or is_just_pressed("ui_down")) as int
+	result.x += (is_just_pressed("d") or is_just_pressed("ui_right")) as int
+	return result
+
+static func wasd_released() -> Vector2:
+	var result := Vector2()
+	result.y -= (is_released("w") or is_released("ui_up")) as int
+	result.x -= (is_released("a") or is_released("ui_left")) as int
+	result.y += (is_released("s") or is_released("ui_down")) as int
+	result.x += (is_released("d") or is_released("ui_right")) as int
 	return result
 
 static func draw_rect(shape: Rect2, color: Color) -> void:
 	core_state.shapes.append(shape)
 	core_state.colors.append(color)
-
-static func set_parent(node: Node) -> void:
-	core_state.current_scene = node
-
-static func reset_parent() -> void:
-	core_state.current_scene = core_state
 
 static func add_child(node: Node, to: Node) -> Variant:
 	if node.name.is_empty(): node.name = "node"
@@ -290,38 +253,28 @@ static func add_child(node: Node, to: Node) -> Variant:
 	return node
 
 static func add_node(node: Node) -> Variant:
-	return add_child(node, core_state.current_scene)
+	return add_child(node, core_state)
 
-# ( Sprite Animation )
-
-class SpriteAnimation extends RefCounted:
-	var frame_row := 0
-	var frame_count := 1
-	var frame_speed := 6
-
-static func make_sprite_animation(frame_row: int, frame_count: int, frame_speed: int) -> SpriteAnimation:
-	var result := SpriteAnimation.new()
-	result.frame_row = frame_row
-	result.frame_count = frame_count
-	result.frame_speed = frame_speed
-	return result
+# ( Sprite )
 
 class Sprite extends Sprite2D:
 	var width: int
 	var height: int
 	var atlas_left: int
 	var atlas_top: int
+	
 	var frame_progress: float
-	var animation: SpriteAnimation
+	var frame_row := 0
+	var frame_count := 1
+	var frame_speed := 6
 
-	func _process(dt: float) -> void:
+	func update(dt: float) -> void:
 		# Update animation.
-		if (animation):
-			if not (animation.frame_count <= 1):
-				frame_progress = fmod(frame_progress + animation.frame_speed * dt, animation.frame_count);
+		if (has_animation):
+			if (frame_count > 1): frame_progress = fmod(frame_progress + frame_speed * dt, frame_count);
 		# Update sprite.
 		if width == 0 or height == 0: return
-		var top := atlas_top + animation.frame_row * height if animation else 0
+		var top := atlas_top + frame_row * height if has_animation() else 0
 		var grid_width := int(max(texture.get_width() - atlas_left, 0) / width)
 		var grid_height := int(max(texture.get_height() - top, 0) / height)
 		if grid_width == 0 or grid_height == 0: return
@@ -331,11 +284,17 @@ class Sprite extends Sprite2D:
 		region_enabled = true
 		region_rect = area
 
+	func has_animation() -> bool:
+		return frame_count != 0
+
+	func has_same_animation(other_frame_row: int, other_frame_count: int, other_frame_speed: int) -> bool:
+		return frame_row == other_frame_row and frame_count == other_frame_count and frame_speed == other_frame_speed
+
 	func has_first_frame() -> bool:
 		return frame() == 0
 
 	func has_last_frame() -> bool:
-		if animation.frameCount != 0: return frame() == animation.frameCount - 1
+		if frame_count != 0: return frame() == frame_count - 1
 		else: return true
 
 	func size() -> Vector2:
@@ -347,10 +306,12 @@ class Sprite extends Sprite2D:
 	func reset(reset_frame := 0) -> void:
 		frame_progress = reset_frame
 
-	func play(other: SpriteAnimation, can_keep_frame := false) -> void:
-		if animation != other:
+	func play(new_frame_row: int, new_frame_count: int, new_frame_speed: int, can_keep_frame := false) -> void:
+		if not has_same_animation(new_frame_row, new_frame_count, new_frame_speed):
 			if can_keep_frame: reset()
-			animation = other
+			frame_row = new_frame_row
+			frame_count = new_frame_count
+			frame_speed = new_frame_speed
 
 	func has_point(point: Vector2) -> bool:
 		return SashimiCore.has_point(self, point)
@@ -358,28 +319,30 @@ class Sprite extends Sprite2D:
 	func has_area(area: Rect2) -> bool:
 		return SashimiCore.has_area(self, area)
 
-static func make_animated_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
+static func make_animated_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int, frame_row: int, frame_count: int, frame_speed: int) -> Sprite:
 	var result := Sprite.new()
 	result.name = "sprite"
 	result.width = width
 	result.height = height
 	result.atlas_left = atlas_left
 	result.atlas_top = atlas_top
-	result.animation = animation
+	result.frame_row = frame_row
+	result.frame_count = frame_count
+	result.frame_speed = frame_speed
 	result.texture = texture
 	return result
 
 static func make_sliced_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
-	return make_animated_sprite(texture, width, height, atlas_left, atlas_top, null)
+	return make_animated_sprite(texture, width, height, atlas_left, atlas_top, 0, 0, 0)
 
 static func make_sprite(texture: Texture2D) -> Sprite:
-	var result := make_animated_sprite(texture, 0, 0, 0, 0, null)
+	var result := make_animated_sprite(texture, 0, 0, 0, 0, 0, 0, 0)
 	result.width = result.texture.get_width()
 	result.height = result.texture.get_height()
 	return result
 
-static func add_animated_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int, animation: SpriteAnimation) -> Sprite:
-	return add_node(make_animated_sprite(texture, width, height, atlas_left, atlas_top, animation))
+static func add_animated_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int, frame_row: int, frame_count: int, frame_speed: int) -> Sprite:
+	return add_node(make_animated_sprite(texture, width, height, atlas_left, atlas_top, frame_row, frame_count, frame_speed))
 
 static func add_sliced_sprite(texture: Texture2D, width: int, height: int, atlas_left: int, atlas_top: int) -> Sprite:
 	return add_node(make_sliced_sprite(texture, width, height, atlas_left, atlas_top))
@@ -481,7 +444,7 @@ static func button(object: Variant) -> bool:
 	else:
 		panic(TYPE_ERROR_MESSAGE)
 	# Update.
-	var is_hot := area.has_point(mouse_screen_position())
+	var is_hot := area.has_point(mouse())
 	var is_active := is_hot and is_pressed("mouse_left")
 	var is_clicked := is_hot and is_just_pressed("mouse_left")
 	# Draw.
@@ -512,14 +475,14 @@ class Result extends RefCounted:
 		return value
 
 static func some(value: Variant) -> Result:
-	var result := Result.new()
-	result.value = value
-	return result
+	result_buffer.value = value
+	result_buffer.fault = 0
+	return result_buffer
 
 static func none(fault := 1) -> Result:
-	var result := Result.new()
-	result.fault = fault
-	return result
+	result_buffer.value = null
+	result_buffer.fault = fault
+	return result_buffer
 
 # ( Script )
 
@@ -531,6 +494,7 @@ static func ready_script(parent: Node) -> void:
 	core_state = CoreState.new()
 	core_state.name = "sashimi_core_state"
 	parent.add_child(core_state)
+	result_buffer = Result.new()
 
 static func test_script() -> void:
 	assert(none().is_none() == true);
