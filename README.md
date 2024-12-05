@@ -1,6 +1,6 @@
 # Sashimi
 
-A utility library for the Godot Game Engine.
+A utility library for the Godot Engine.
 It provides basic data structures and functions that work without the editor.
 Everything is contained in a single standalone script that can be easily copied into a project with no extra setup required.
 

@@ -2,7 +2,6 @@ extends Node
 
 const core  := preload("sashimi/core.gd")
 const icon  := preload("../icon.svg")
-const scene := preload("scene.tscn")
 
 var sprite: core.Sprite
 var map: core.Map
