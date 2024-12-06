@@ -17,21 +17,21 @@ const MAX_INT   := 9223372036854775807
 const MIN_FLOAT := -1.79769e308
 const MAX_FLOAT := 1.79769e308
 
-const GRAY1 := Color("202020")
-const GRAY2 := Color("606060")
-const GRAY3 := Color("9f9f9f")
-const GRAY4 := Color("dfdfdf")
-
 const DIGIT_CHARS := "0123456789"
 const UPPER_CHARS := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const LOWER_CHARS := "abcdefghijklmnopqrstuvwxyz"
 const ALPHA_CHARS := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-const TYPE_ERROR_MESSAGE := "Function does not support the given type."
+const TYPE_ERROR_MESSAGE := "Type is not supported."
 const MAP_ERROR_MESSAGE := "Tile does not exist."
 
 const DEFAULT_ASSETS_PATH := "res://assets/"
 const TEXT_FILE_TYPES := ["txt", "ini", "sv", "md"]
+
+const GRAY1 := Color("202020")
+const GRAY2 := Color("606060")
+const GRAY3 := Color("9f9f9f")
+const GRAY4 := Color("dfdfdf")
 
 # ( General Utilities )
 
@@ -49,17 +49,15 @@ class CoreState extends Node2D:
 		if not InputMap.has_action("0"):
 			for c: String in DIGIT_CHARS:
 				var event := InputEventKey.new()
-				@warning_ignore("int_as_enum_without_cast")
-				event.keycode = c.unicode_at(0)
+				event.keycode = c.unicode_at(0) as Key
 				InputMap.add_action(c)
 				InputMap.action_add_event(c, event)
 			for c: String in UPPER_CHARS:
 				var event := InputEventKey.new()
-				@warning_ignore("int_as_enum_without_cast")
-				event.keycode = c.unicode_at(0)
+				event.keycode = c.unicode_at(0) as Key
 				InputMap.add_action(c)
-				InputMap.action_add_event(c, event)
 				InputMap.add_action(c.to_lower())
+				InputMap.action_add_event(c, event)
 				InputMap.action_add_event(c.to_lower(), event)
 			var esc_event := InputEventKey.new()
 			esc_event.keycode = KEY_ESCAPE
@@ -90,14 +88,16 @@ static func is_number_type(value: Variant) -> bool:
 static func is_vector_type(value: Variant) -> bool:
 	return value is Vector2 or value is Vector3 or value is Vector4
 
+static func is_vectori_type(value: Variant) -> bool:
+	return value is Vector2i or value is Vector3i or value is Vector4i
+
 static func quit() -> void:
 	core_state.get_tree().quit()
 
 static func panic(message: String) -> void:
-	print(message)
+	if message.length() != 0: print(message)
+	assert(false, message)
 	quit()
-	@warning_ignore("assert_always_false")
-	assert(0, message)
 
 # TODO: Think about it. I only use it for text files. Also assets path in Godot is maybe weird.
 # NOTE: There is also this thing about exporting and not including some files...
@@ -255,6 +255,36 @@ static func add_child(node: Node, to: Node) -> Variant:
 static func add_node(node: Node) -> Variant:
 	return add_child(node, core_state)
 
+# ( Error Handling )
+
+class Result extends RefCounted:
+	var value: Variant
+	var fault: int
+
+	func is_none() -> bool:
+		return fault != 0
+
+	func is_some() -> bool:
+		return fault == 0
+
+	func take() -> Variant:
+		if is_some():
+			SashimiCore.panic("Fault `{0}` was detected.".format([fault]))
+		return value
+
+	func take_or() -> Variant:
+		return value
+
+static func some(value: Variant) -> Result:
+	result_buffer.value = value
+	result_buffer.fault = 0
+	return result_buffer
+
+static func none(fault := 1) -> Result:
+	result_buffer.value = null
+	result_buffer.fault = fault
+	return result_buffer
+
 # ( Sprite )
 
 class Sprite extends Sprite2D:
@@ -356,11 +386,12 @@ class Map extends Node2D:
 	var tiles: PackedInt32Array
 	var tile_width: int
 	var tile_height: int
+	var soft_max_row_count: int
+	var soft_max_col_count: int
 	var texture: Texture2D
-	var estimated_max_row_count: int
-	var estimated_max_col_count: int
-	const max_row_count := 128
-	const max_col_count := 128
+	
+	const max_row_count := 256
+	const max_col_count := 256
 
 	# TODO: Maybe make it work with a camera.
 	func _draw() -> void:
@@ -371,7 +402,7 @@ class Map extends Node2D:
 		for tile in tiles:
 			if i == length():
 				break
-			if tile == -1:
+			if tile < 0:
 				i += 1
 				continue
 			var texture_grid_row := int(tile / float(texture_grid_width))
@@ -402,19 +433,22 @@ class Map extends Node2D:
 		for i in range(0, len(tiles)):
 			tiles[i] = value
 
-	# TODO: Not done yet.
+	# TODO: Not done yet for some reason? Works for now though.
 	func parse(csv: String) -> void:
 		fill(-1)
-		estimated_max_row_count = 0
-		estimated_max_col_count = 0
+		soft_max_row_count = 0
+		soft_max_col_count = 0
 		for line: String in csv.rsplit("\n"):
 			if len(line) == 0: continue
-			estimated_max_row_count += 1
-			estimated_max_col_count = 0
+			soft_max_row_count += 1
+			soft_max_col_count = 0
 			for value: String in line.rsplit(","):
-				estimated_max_col_count += 1
-				if value.is_valid_int(): put(value.to_int(), estimated_max_row_count - 1, estimated_max_col_count - 1)
+				soft_max_col_count += 1
+				if value.is_valid_int(): put(value.to_int(), soft_max_row_count - 1, soft_max_col_count - 1)
 				else: return
+
+	func read_and_parse(path: String) -> void:
+		parse(SashimiCore.read(path))
 
 static func make_map(texture: Texture2D, tile_width: int, tile_height: int) -> Map:
 	var result := Map.new()
@@ -431,8 +465,8 @@ static func add_map(texture: Texture2D, tile_width: int, tile_height: int) -> Ma
 	return add_node(make_map(texture, tile_width, tile_height))
 
 # ( GUI )
+# NOTE: This is experimental stuff.
 
-# TODO: Will be funny if it works.
 static func button(object: Variant) -> bool:
 	var is_rect := true
 	var area := Rect2()
@@ -454,36 +488,6 @@ static func button(object: Variant) -> bool:
 		else: draw_rect(area, GRAY3)
 	return is_clicked
 
-# ( Error Handling )
-
-class Result extends RefCounted:
-	var value: Variant
-	var fault: int
-
-	func is_none() -> bool:
-		return fault != 0
-
-	func is_some() -> bool:
-		return fault == 0
-
-	func take() -> Variant:
-		if is_some():
-			SashimiCore.panic("Fault `{0}` was detected.".format([fault]))
-		return value
-
-	func take_or() -> Variant:
-		return value
-
-static func some(value: Variant) -> Result:
-	result_buffer.value = value
-	result_buffer.fault = 0
-	return result_buffer
-
-static func none(fault := 1) -> Result:
-	result_buffer.value = null
-	result_buffer.fault = fault
-	return result_buffer
-
 # ( Script )
 
 static func is_script_ready() -> bool:
@@ -503,4 +507,3 @@ static func test_script() -> void:
 	assert(some(9).is_none() == false);
 	assert(some(9).is_some() == true);
 	assert(some(9).take_or() == 9);
-
